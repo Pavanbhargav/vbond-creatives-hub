@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# node
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+.turbo/
+.vercel/
+
+# python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.sqlite3
+db.sqlite3
+staticfiles/
+media/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# editor
+.vscode/
+.idea/
+
+# misc
+Thumbs.db
+.cache/
+*.pid
+docker-compose.override.yml
