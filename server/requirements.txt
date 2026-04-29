@@ -5,6 +5,7 @@ djangorestframework==3.17.1
 dotenv==0.9.9
 gunicorn==25.3.0
 packaging==26.2
+psycopg2-binary==2.9.12
 python-dotenv==1.2.2
 sqlparse==0.5.5
 whitenoise==6.12.0
