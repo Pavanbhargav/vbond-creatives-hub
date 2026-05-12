@@ -4,9 +4,12 @@ from rest_framework.permissions import AllowAny
 from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
-
+from rest_framework.permissions import IsAuthenticated
 from .serializers import RegisterSerializer, UserSerializer
+from django.contrib.auth import get_user_model
 
+
+User = get_user_model()
 # Helper function to generate the tokens
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -108,3 +111,24 @@ class LogoutView(APIView):
         response.delete_cookie('access_token', path='/', samesite='None')
         response.delete_cookie('refresh_token', path='/', samesite='None')
         return response
+
+
+
+
+class UserDetailView(APIView):
+    # This automatically checks the HTTP-Only cookie using the custom class we built earlier!
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # If the cookie is valid, it returns the user's data
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+
+class UserListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self,request):
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data,status = status.HTTP_200_OK)

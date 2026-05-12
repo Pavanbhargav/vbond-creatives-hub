@@ -1,6 +1,16 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Poppins } from "next/font/google";
+import { Space_Grotesk, Poppins, Noto_Sans, DM_Sans } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
+
+const spaceGroteskHeading = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-heading",
+});
+
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -26,9 +36,20 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${poppins.variable} h-full antialiased`}
+      className={cn(
+        "h-full",
+        "antialiased",
+        spaceGrotesk.variable,
+        poppins.variable,
+        "font-sans",
+        dmSans.variable,
+        spaceGroteskHeading.variable,
+      )}
     >
-      <body className="min-h-full flex flex-col font-poppins">{children}</body>
+      <body className="min-h-full flex flex-col font-poppins">
+        <TooltipProvider>{children}</TooltipProvider>
+        <Toaster richColors position="bottom-right" />
+      </body>
     </html>
   );
 }
