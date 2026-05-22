@@ -3,7 +3,7 @@
 # Create your models here.
 from django.db import models
 from apps.accounts.models import User
-from apps.workspace.models import Workspace
+from apps.workspace.models import Workspace,Team
 
 class Task(models.Model):
     """
@@ -71,27 +71,61 @@ class Task(models.Model):
         related_name='tasks_created',
         help_text="Who allocated the task."
     )
-    concept_by = models.ForeignKey(
-        User, 
+    approval_team = models.ForeignKey(
+        Team, 
         on_delete=models.SET_NULL, 
         null=True, 
-        blank=True,
-        related_name='tasks_concept'
+        blank=True, 
+        related_name="tasks_to_approve",
+        help_text="The team responsible for reviewing and approving this task."
     )
-    design_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='tasks_design'
-    )
-    content_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='tasks_content'
-    )
+    
 
     def __str__(self):
-        return f"{self.title} ({self.status})"
+        return f"{self.title}"
+
+
+class TaskFile(models.Model):
+    """
+    Model to handle multiple files per task.
+    """
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="files")
+    user = models.ForeignKey(User, on_delete = models.CASCADE,related_name="user_files")
+    file = models.FileField(upload_to="task_files/")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file.name
+
+
+class Approvals(models.Model):
+    """
+    Model to track individual approval history and feedback for each team member.
+    """
+    APPROVAL_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('rework', 'Rework'),
+    ]
+    
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="approvals")
+    
+    # Track the specific person from the team who is making the decision
+    approver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="my_approvals")
+    
+    status = models.CharField(max_length=20, choices=APPROVAL_CHOICES, default='pending')
+    
+    # Essential for rework instructions and feedback
+    comment = models.TextField(blank=True, null=True) 
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        # Prevents the same user from having two separate approval records for the same task
+        unique_together = ('task', 'approver') 
+
+    def __str__(self):
+        return f"{self.task.title}-{self.status}"
+        
