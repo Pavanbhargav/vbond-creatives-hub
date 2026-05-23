@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { useRouter } from "next/navigation";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { useAuthStore } from "@/store/authStore";
 import { useTaskStore } from "@/store/taskStore";
@@ -13,6 +13,8 @@ import {
   approvalList,
   approveTask,
 } from "@/api/tasksapi";
+import { getusers } from "@/api/auth";
+import { getTeams } from "@/api/workspaceapi";
 
 import {
   Card,
@@ -70,6 +72,7 @@ import {
 } from "@/components/ui/table";
 
 export default function TaskPage() {
+  const router = useRouter();
   const {
     selectedWorkspace,
     isAdmin,
@@ -122,11 +125,18 @@ export default function TaskPage() {
       status: "Briefed",
       deadline: "",
       estimated_hours: 4,
+      assignee: "",
+      approval_team: "",
     });
+
+  const [users, setUsers] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
 
   useEffect(() => {
     if (selectedWorkspace) {
       fetchTasks(selectedWorkspace.id);
+      getusers().then(res => setUsers(res.data || []));
+      getTeams(selectedWorkspace.id).then(res => setTeams(res || []));
     }
   }, [selectedWorkspace, fetchTasks]);
 
@@ -140,9 +150,21 @@ export default function TaskPage() {
     setIsCreating(true);
 
     try {
+      const payload: any = { ...formData };
+      if (!payload.assignee || payload.assignee === "none" || payload.assignee === "") {
+        toast.error("Please assign the task to a user.");
+        setIsCreating(false);
+        return;
+      }
+      if (!payload.approval_team || payload.approval_team === "none" || payload.approval_team === "") {
+        toast.error("Please select an approval team.");
+        setIsCreating(false);
+        return;
+      }
+
       await createTask(
         selectedWorkspace.id,
-        formData
+        payload
       );
 
       toast.success(
@@ -160,6 +182,8 @@ export default function TaskPage() {
         status: "Briefed",
         deadline: "",
         estimated_hours: 4,
+        assignee: "",
+        approval_team: "",
       });
 
       fetchTasks(selectedWorkspace.id);
@@ -511,6 +535,44 @@ export default function TaskPage() {
                       }
                     />
                   </div>
+
+                  {/* ASSIGNEE */}
+                  <div className="space-y-2">
+                    <Label>Assignee</Label>
+                    <Select
+                      value={formData.assignee}
+                      onValueChange={(value) => setFormData({ ...formData, assignee: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Assignee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {users.map((u) => (
+                          <SelectItem key={u.id} value={u.id.toString()}>{u.username}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* APPROVAL TEAM */}
+                  <div className="space-y-2">
+                    <Label>Approval Team</Label>
+                    <Select
+                      value={formData.approval_team}
+                      onValueChange={(value) => setFormData({ ...formData, approval_team: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Team" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Team</SelectItem>
+                        {teams.map((t) => (
+                          <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {/* ACTIONS */}
@@ -596,7 +658,7 @@ export default function TaskPage() {
                   Est. Hrs
                 </TableHead>
 
-                <TableHead>
+                <TableHead className="text-right">
                   Actions
                 </TableHead>
               </TableRow>
@@ -606,6 +668,8 @@ export default function TaskPage() {
               {tasks.map((task) => (
                 <TableRow
                   key={task.id}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => router.push(`/dashboard/approvals?taskId=${task.id}`)}
                 >
                   <TableCell className="font-medium">
                     {task.title}
@@ -656,28 +720,20 @@ export default function TaskPage() {
                     h
                   </TableCell>
 
-                  <TableCell>
-                    <div className="flex items-center gap-2">
+                  <TableCell className="text-right">
+                    {(task.assignee === user?.id || isAdmin) && (
                       <Button
                         variant="ghost"
-                        size="icon"
-                        title="Upload File"
-                        onClick={() => {
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setSelectedTaskId(task.id);
                           setUploadDialogOpen(true);
                         }}
                       >
-                        <Upload size={18} />
+                        <Upload className="h-4 w-4 text-muted-foreground hover:text-primary" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Details & Approvals"
-                        onClick={() => openTaskDetails(task.id)}
-                      >
-                        <Eye size={18} />
-                      </Button>
-                    </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

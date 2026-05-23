@@ -7,9 +7,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from .serializers import RegisterSerializer, UserSerializer
 from django.contrib.auth import get_user_model
-
+from django.conf import settings
 
 User = get_user_model()
+
+# Environment-aware cookie settings
+COOKIE_SECURE = not settings.DEBUG
+COOKIE_SAMESITE = 'Lax' if settings.DEBUG else 'None'
 # Helper function to generate the tokens
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
@@ -33,8 +37,8 @@ class SignupView(APIView):
             }, status=status.HTTP_201_CREATED)
             
             # Set the HTTP-Only cookies
-            response.set_cookie('access_token', tokens['access'], httponly=True, path='/', samesite='None', secure=True)
-            response.set_cookie('refresh_token', tokens['refresh'], httponly=True, path='/', samesite='None', secure=True)
+            response.set_cookie('access_token', tokens['access'], httponly=True, path='/', samesite=COOKIE_SAMESITE, secure=COOKIE_SECURE)
+            response.set_cookie('refresh_token', tokens['refresh'], httponly=True, path='/', samesite=COOKIE_SAMESITE, secure=COOKIE_SECURE)
             return response
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -57,8 +61,8 @@ class LoginView(APIView):
             })
             
             # Set the HTTP-Only cookies
-            response.set_cookie('access_token', tokens['access'], httponly=True, path='/', samesite='None', secure=True)
-            response.set_cookie('refresh_token', tokens['refresh'], httponly=True, path='/', samesite='None', secure=True)
+            response.set_cookie('access_token', tokens['access'], httponly=True, path='/', samesite=COOKIE_SAMESITE, secure=COOKIE_SECURE)
+            response.set_cookie('refresh_token', tokens['refresh'], httponly=True, path='/', samesite=COOKIE_SAMESITE, secure=COOKIE_SECURE)
             return response
             
         return Response({'error': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -83,7 +87,7 @@ class RefreshTokenView(APIView):
 
             response = Response({'detail': 'Access token refreshed successfully'})
             # Give the browser the new 15-minute access token
-            response.set_cookie('access_token', access_token, httponly=True, path='/', samesite='None', secure=True)
+            response.set_cookie('access_token', access_token, httponly=True, path='/', samesite=COOKIE_SAMESITE, secure=COOKIE_SECURE)
             return response
 
         except Exception:
@@ -108,8 +112,8 @@ class LogoutView(APIView):
 
         response = Response({'detail': 'Logged out successfully'})
         # Instruct the browser to destroy the cookies
-        response.delete_cookie('access_token', path='/', samesite='None')
-        response.delete_cookie('refresh_token', path='/', samesite='None')
+        response.delete_cookie('access_token', path='/', samesite=COOKIE_SAMESITE)
+        response.delete_cookie('refresh_token', path='/', samesite=COOKIE_SAMESITE)
         return response
 
 

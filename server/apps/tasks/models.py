@@ -128,4 +128,20 @@ class Approvals(models.Model):
 
     def __str__(self):
         return f"{self.task.title}-{self.status}"
-        
+
+
+class TaskHistory(models.Model):
+    """
+    Model to track the entire history of a task including file uploads, approval comments, and rework requests.
+    """
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="history")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="task_history")
+    action = models.CharField(max_length=50) # e.g., 'approved', 'rework', 'file_uploaded', 'comment'
+    comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.task.title} - {self.action} by {self.user.username}"

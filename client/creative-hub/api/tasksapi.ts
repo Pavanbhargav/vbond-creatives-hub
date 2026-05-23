@@ -51,10 +51,20 @@ export const uploadTaskFile = async(taskId:number, file:File)=> {
 
 export const showTaskFile = async (taskId: number) => {
   try {
-    const response = await api.get(`/tasks/files/${taskId}/`);
+    const response = await api.get(`/tasks/${taskId}/files/`);
     return response.data;
   } catch (error) {
     console.error('Failed to fetch files', error);
+    throw error;
+  }
+};
+
+export const getTaskFileById = async (fileId: number) => {
+  try {
+    const response = await api.get(`/tasks/files/${fileId}/`);
+    return response.data;
+  } catch (error) {
+    console.error('Failed to fetch file by ID', error);
     throw error;
   }
 };
@@ -69,12 +79,32 @@ export const approvalList = async (taskId: number) => {
   }
 };
 
+export const getTaskHistory = async (taskId: number) => {
+  try {
+    const response = await api.get(`/tasks/${taskId}/history/`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch task history", error);
+    throw error;
+  }
+};
+
 export const approveTask = async (taskId: number, payload: { status: string; comment?: string }) => {
   try {
     const response = await api.patch(`/tasks/${taskId}/approve/`, payload);
     return response.data;
   } catch (error) {
     console.error("Failed to approve task", error);
+    throw error;
+  }
+};
+
+export const getPendingApprovals = async (workspaceId: string | number) => {
+  try {
+    const response = await api.get(`/tasks/workspace/${workspaceId}/pending-approvals/`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch pending approvals", error);
     throw error;
   }
 };

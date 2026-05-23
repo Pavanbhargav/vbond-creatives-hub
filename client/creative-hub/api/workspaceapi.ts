@@ -83,3 +83,13 @@ export const addTeamMembers = async (teamId:string|number, workspaceId:string|nu
         throw error;
     }
 };
+
+export const getTeamPerformance = async (workspaceId: string | number, teamId: string | number) => {
+  try {
+    const response = await api.get(`/workspaces/${workspaceId}/teams/${teamId}/performance/`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch team performance", error);
+    throw error;
+  }
+};

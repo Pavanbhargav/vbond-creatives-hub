@@ -1,15 +1,16 @@
 # views.py
-from rest_framework import generics,status
+from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
-from .models import Task, TaskFile
+from .models import Task, TaskFile, Approvals, TaskHistory
 from apps.workspace.models import Workspace, WorkspaceMembers
-from .serializers import TaskSerializer,TaskFileSerializer,ApprovalSerializer
+from .serializers import TaskSerializer, TaskFileSerializer, ApprovalSerializer, TaskHistorySerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import Approvals
+from django.utils import timezone
+
 class TaskListCreateView(generics.ListCreateAPIView):
     """
     GET /api/workspaces/<workspace_id>/tasks/
@@ -59,10 +60,19 @@ class TaskListCreateView(generics.ListCreateAPIView):
             raise PermissionDenied("You do not have access to this workspace.")
 
         # 2. Save the task, automatically injecting the workspace and the creator
-        serializer.save(
+        task = serializer.save(
             workspace=workspace, 
             created_by=self.request.user
         )
+
+        # 3. Create initial Approvals records for the approval team
+        if task.approval_team:
+            for member in task.approval_team.members.all():
+                Approvals.objects.create(
+                    task=task,
+                    approver=member,
+                    status='pending'
+                )
 
 class TaskUploadView(APIView):
     """
@@ -94,14 +104,33 @@ class TaskUploadView(APIView):
                 file=f
             )
             # Serialize the saved file to return to the frontend
-            uploaded_files.append(TaskFileSerializer(task_file).data)
+            uploaded_files.append(TaskFileSerializer(task_file, context={'request': request}).data)
+
+        # Log history
+        TaskHistory.objects.create(
+            task=task,
+            user=request.user,
+            action="file_uploaded",
+            comment=f"Uploaded {len(files)} file(s)"
+        )
+
+        # Update submitted_at if first submission
+        if not task.submitted_at:
+            task.submitted_at = timezone.now()
+
+        # Reset approvals and change status since a new file was uploaded
+        task.status = 'In Review'
+        task.save()
+        
+        # Reset all approvals so the review cycle restarts
+        Approvals.objects.filter(task=task).update(status='pending', comment=None)
 
         return Response({
             "detail": f"Successfully uploaded {len(files)} file(s).",
             "files": uploaded_files
         }, status=status.HTTP_201_CREATED)
 
-class FileView(generics.ListAPIView):
+class TaskFileListView(generics.ListAPIView):
     serializer_class = TaskFileSerializer
     permission_classes = [IsAuthenticated]
 
@@ -128,6 +157,29 @@ class FileView(generics.ListAPIView):
             task=task
         ).select_related("user")
 
+class TaskFileDetailView(generics.RetrieveAPIView):
+    """
+    GET /api/tasks/files/<int:task_file_id>/
+    Retrieves a single file submission by its ID.
+    """
+    serializer_class = TaskFileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        task_file_id = self.kwargs.get("task_file_id")
+        task_file = get_object_or_404(TaskFile, id=task_file_id)
+
+        # Permission check
+        is_workspace_member = WorkspaceMembers.objects.filter(
+            workspace=task_file.task.workspace,
+            user=self.request.user
+        ).exists()
+
+        if not is_workspace_member:
+            raise PermissionDenied("You do not have access to this file.")
+
+        return task_file
+
 class TaskApprovalListView(generics.ListAPIView):
     """
     GET /api/tasks/<task_id>/approvals/
@@ -141,6 +193,17 @@ class TaskApprovalListView(generics.ListAPIView):
         # Return all approvals for this task, ordered by creation
         return Approvals.objects.filter(task_id=task_id).order_by('id')
 
+class TaskHistoryListView(generics.ListAPIView):
+    """
+    GET /api/tasks/<task_id>/history/
+    Returns the chronological history of events for a task.
+    """
+    serializer_class = TaskHistorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        task_id = self.kwargs.get('task_id')
+        return TaskHistory.objects.filter(task_id=task_id).order_by('-created_at')
 
 class SubmitApprovalDecisionView(generics.UpdateAPIView):
     """
@@ -167,6 +230,14 @@ class SubmitApprovalDecisionView(generics.UpdateAPIView):
         # 2. Save the user's decision ('approved', 'rework', etc.) and their comment
         approval = serializer.save()
         
+        # Log to TaskHistory
+        TaskHistory.objects.create(
+            task=approval.task,
+            user=self.request.user,
+            action=approval.status,
+            comment=approval.comment
+        )
+
         # 3. MAGIC LOGIC: Check if we need to update the main Task status!
         task = approval.task
         
@@ -187,4 +258,31 @@ class SubmitApprovalDecisionView(generics.UpdateAPIView):
                 task.status = 'Approved'
                 task.approved_at = timezone.now()
                 task.save()
+        
+class PendingApprovalsListView(generics.ListAPIView):
+    """
+    GET /api/tasks/workspace/<workspace_id>/pending-approvals/
+    Returns all tasks in the workspace that are pending approval from the requesting user.
+    """
+    serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        workspace_id = self.kwargs.get('workspace_id')
+        
+        is_member = WorkspaceMembers.objects.filter(
+            workspace_id=workspace_id, 
+            user=self.request.user
+        ).exists()
+        
+        if not is_member:
+            raise PermissionDenied("You do not have access to this workspace.")
+
+        pending_task_ids = Approvals.objects.filter(
+            approver=self.request.user,
+            status='pending',
+            task__workspace_id=workspace_id
+        ).values_list('task_id', flat=True)
+
+        return Task.objects.filter(id__in=pending_task_ids)
         

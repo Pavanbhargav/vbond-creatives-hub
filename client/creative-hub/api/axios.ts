@@ -12,12 +12,16 @@ api.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401) {
+    // If it's a 401 and we haven't retried yet, and it's not the refresh endpoint itself
+    if (error.response?.status === 401 && !originalRequest._retry && originalRequest.url !== "/accounts/refresh/") {
+      originalRequest._retry = true;
       try {
         await api.post("/accounts/refresh/");
-        return api.request(error.config);
+        return api.request(originalRequest);
       } catch (refreshError) {
+        // If the refresh token is also invalid/expired
         window.location.href = "/login";
+        return Promise.reject(refreshError);
       }
     }
     return Promise.reject(error);

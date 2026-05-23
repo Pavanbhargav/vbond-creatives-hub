@@ -236,3 +236,94 @@ class AddTeamMemberView(APIView):
             team.members.add(target_user)
 
         return Response({"detail": f"{target_user.username} was successfully added to the team."}, status=status.HTTP_200_OK)
+
+class TeamPerformanceView(APIView):
+    """
+    GET /api/workspaces/<workspace_id>/teams/<team_id>/performance/
+    Returns performance metrics for all members of the team.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, workspace_id, team_id):
+        is_member = WorkspaceMembers.objects.filter(
+            workspace_id=workspace_id,
+            user=request.user
+        ).exists()
+        if not is_member:
+            raise PermissionDenied("You do not have access to this workspace.")
+            
+        team = get_object_or_404(Team, id=team_id, workspace_id=workspace_id)
+        
+        from apps.tasks.models import Task
+        
+        performance_data = []
+        for member in team.members.all():
+            tasks = Task.objects.filter(workspace_id=workspace_id, assignee=member)
+            
+            total_tasks = tasks.count()
+            active_tasks_qs = tasks.filter(status__in=['Briefed', 'In Progress', 'In Review', 'Rework'])
+            active_tasks_count = active_tasks_qs.count()
+            done_tasks_qs = tasks.filter(status__in=['Approved', 'Delivered'])
+            done_tasks_count = done_tasks_qs.count()
+            
+            total_reworks = sum(t.reworks for t in tasks)
+            
+            # Productivity Calculation
+            total_est = sum(t.estimated_hours for t in tasks)
+            total_act = sum(t.actual_hours for t in tasks)
+            
+            time_eff = 100
+            if total_act > 0:
+                time_eff = min((total_est / total_act) * 100, 100)
+            elif total_tasks > 0 and total_est > 0:
+                time_eff = 100
+            elif total_tasks > 0:
+                time_eff = 50 # fallback
+                
+            rework_penalty = max(total_reworks * -8, -40)
+            delivery_rate = (done_tasks_count / total_tasks * 30) if total_tasks > 0 else 0
+            
+            on_time_count = 0
+            for t in done_tasks_qs:
+                completion_date = t.approved_at or t.submitted_at
+                if completion_date and completion_date.date() <= t.deadline:
+                    on_time_count += 1
+            on_time_rate = (on_time_count / done_tasks_count * 30) if done_tasks_count > 0 else 0
+            
+            productivity_raw = time_eff + delivery_rate + on_time_rate + rework_penalty
+            productivity = int(min(max(productivity_raw, 0), 100))
+            if total_tasks == 0:
+                productivity = 100
+                
+            current_tasks = []
+            for t in active_tasks_qs.order_by('deadline')[:3]:
+                current_tasks.append({
+                    'id': t.id,
+                    'title': t.title,
+                    'status': t.status,
+                    'deadline': t.deadline.strftime('%d %b') if t.deadline else None,
+                })
+                
+            # Default skills since User model might not have them
+            skills = ['Social Media', 'Banners', 'Branding']
+                
+            performance_data.append({
+                'user': {
+                    'id': member.id,
+                    'username': member.username,
+                    'first_name': member.first_name,
+                    'last_name': member.last_name,
+                    'skills': skills,
+                    'role': 'Sr. Graphic Designer' if member.id % 2 == 0 else 'Graphic Designer' # Dummy role
+                },
+                'total': total_tasks,
+                'active': active_tasks_count,
+                'done': done_tasks_count,
+                'reworks': total_reworks,
+                'productivity': productivity,
+                'workload': int(min((active_tasks_count / 8) * 100, 100)),
+                'active_count': active_tasks_count,
+                'current_tasks': current_tasks
+            })
+            
+        return Response(performance_data)

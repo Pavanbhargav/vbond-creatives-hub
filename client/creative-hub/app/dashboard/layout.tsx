@@ -242,17 +242,17 @@ export default function DashboardLayout({
       icon: Kanban,
     },
 
-    {
-      name: "Calendar",
-      href: "/dashboard/calendar",
-      icon: Calendar,
-    },
+    // {
+    //   name: "Calendar",
+    //   href: "/dashboard/calendar",
+    //   icon: Calendar,
+    // },
 
-    {
-      name: "Report",
-      href: "/dashboard/report",
-      icon: FileText,
-    },
+    // {
+    //   name: "Report",
+    //   href: "/dashboard/report",
+    //   icon: FileText,
+    // },
   ];
 
   // ONLY ORGANIZATIONAL
@@ -266,17 +266,17 @@ export default function DashboardLayout({
 
   // ONLY ADMIN
   const adminMenuItems = [
-    {
-      name: "Allocate Task",
-      href: "/dashboard/allocate-task",
-      icon: ClipboardList,
-    },
+    // {
+    //   name: "Allocate Task",
+    //   href: "/dashboard/allocate-task",
+    //   icon: ClipboardList,
+    // },
 
-    {
-      name: "Auto Allocation",
-      href: "/dashboard/auto-allocation",
-      icon: Bot,
-    },
+    // {
+    //   name: "Auto Allocation",
+    //   href: "/dashboard/auto-allocation",
+    //   icon: Bot,
+    // },
 
     {
       name: "Approvals",
@@ -284,11 +284,11 @@ export default function DashboardLayout({
       icon: CheckCircle,
     },
 
-    {
-      name: "Analytics",
-      href: "/dashboard/analytics",
-      icon: BarChart,
-    },
+    // {
+    //   name: "Analytics",
+    //   href: "/dashboard/analytics",
+    //   icon: BarChart,
+    // },
   ];
 
   return (
